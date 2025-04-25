@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Online Arbitrage Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 480px;
+      margin: auto;
+      background-color: #f9f9f9;
+    }
+    h2 {
+      text-align: center;
+    }
+    label, input, button {
+      display: block;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    input, button {
+      padding: 10px;
+      font-size: 1rem;
+    }
+    .result {
+      margin-top: 20px;
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <h2>Online Arbitrage Calculator</h2>
+
+  <label for="audOdds">Odds in AUD 🇦🇺</label>
+  <input type="number" id="audOdds" step="0.01" />
+
+  <label for="euroOdds">Odds in EUR 🇪🇺</label>
+  <input type="number" id="euroOdds" step="0.01" />
+
+  <label for="stake">Total Stake (AUD)</label>
+  <input type="number" id="stake" value="100" />
+
+  <button onclick="calculateArbitrage()">Calculate</button>
+
+  <div class="result" id="resultBox" style="display: none;"></div>
+
+  <script>
+    async function calculateArbitrage() {
+      const audOdds = parseFloat(document.getElementById('audOdds').value);
+      const euroOdds = parseFloat(document.getElementById('euroOdds').value);
+      const stake = parseFloat(document.getElementById('stake').value);
+      const resultBox = document.getElementById('resultBox');
+
+      if (!audOdds || !euroOdds || !stake) {
+        alert('Please fill all the fields.');
+        return;
+      }
+
+      const response = await fetch('https://api.exchangerate.host/latest?base=AUD&symbols=EUR');
+      const data = await response.json();
+      const exchangeRate = data.rates.EUR;
+
+      const impliedProb1 = 1 / audOdds;
+      const euroOddsConverted = euroOdds / exchangeRate;
+      const impliedProb2 = 1 / euroOddsConverted;
+      const totalProb = impliedProb1 + impliedProb2;
+
+      let resultHtml = `<p>Total Implied Probability: <strong>${totalProb.toFixed(4)}</strong></p>`;
+
+      if (totalProb < 1) {
+        const bet1 = Math.round(((stake * impliedProb2) / totalProb) / 5) * 5;
+        const bet2 = Math.round(((stake * impliedProb1) / totalProb) / 5) * 5;
+        const payout1 = bet1 * audOdds;
+        const payout2 = (bet2 * euroOdds) / exchangeRate;
+        const guaranteedReturn = Math.min(payout1, payout2);
+        const profit = guaranteedReturn - (bet1 + bet2);
+        const profitPercent = (profit / stake) * 100;
+
+        resultHtml += `<p>✅ Arbitrage Opportunity!</p>`;
+        resultHtml += `<ul><li>Bet $${bet1} on AUD odds</li><li>Bet $${bet2} on EUR odds</li></ul>`;
+        resultHtml += `<p>Estimated Profit: <strong>$${profit.toFixed(2)}</strong> (${profitPercent.toFixed(2)}%)</p>`;
+      } else {
+        resultHtml += `<p>❌ No arbitrage opportunity.</p>`;
+      }
+
+      resultBox.innerHTML = resultHtml;
+      resultBox.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
